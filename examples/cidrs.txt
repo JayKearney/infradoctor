@@ -1,0 +1,7 @@
+# name          cidr
+vpc-prod        10.0.0.0/16
+vpc-staging     10.1.0.0/16
+vpc-dev         10.2.0.0/16
+vpc-shared      172.16.0.0/20
+subnet-legacy   10.0.128.0/24   # inside vpc-prod: overlap!
+vpc-sandbox     192.168.1.10/24 # host bits set
