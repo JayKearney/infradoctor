@@ -1,0 +1,24 @@
+services:
+  frontend:
+    versions: {dev: 3.2.0, staging: 3.2.0, prod: 3.1.4}
+    depends_on: [api-gateway]
+  api-gateway:
+    versions: {dev: 2.4.0, staging: 2.3.1, prod: 2.0.5}
+    depends_on: [auth, orders]
+  auth:
+    versions: {dev: 1.8.0, staging: 1.8.0, prod: 1.8.0}
+    depends_on: [postgres, redis]
+  orders:
+    versions: {dev: 4.0.0, staging: 4.0.0-rc.2, prod: 3.9.2}
+    depends_on: [postgres, kafka]
+  notifications:
+    versions: {dev: 1.2.0, staging: 1.2.0, prod: 1.2.0}
+    depends_on: [kafka]
+  postgres:
+    versions: {dev: 16.4.0, staging: 16.4.0, prod: 16.2.0}
+  redis:
+    versions: {dev: 7.4.1, staging: 7.4.1, prod: 7.4.1}
+  kafka:
+    versions: {dev: 3.8.0, staging: 3.8.0, prod: 3.7.1}
+  eks-cluster:
+    versions: {dev: "1.31", staging: "1.31", prod: "1.28"}
