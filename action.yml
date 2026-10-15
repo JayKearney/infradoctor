@@ -1,0 +1,34 @@
+name: infradoctor
+description: Audit infrastructure hygiene issues (logs, networks, storage, versions, dependencies)
+
+branding:
+  icon: activity
+  color: green
+
+inputs:
+  args:
+    description: 'Arguments for infradoctor, e.g. "network check network/cidrs.txt"'
+    required: true
+  python-version:
+    description: Python version to run infradoctor with
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install infradoctor
+      shell: bash
+      run: pip install --quiet "$ACTION_PATH"
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+
+    - name: Run infradoctor
+      shell: bash
+      run: infradoctor $INFRADOCTOR_ARGS
+      env:
+        INFRADOCTOR_ARGS: ${{ inputs.args }}
