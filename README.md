@@ -81,6 +81,26 @@ Findings:
   is not double-counted.
 - IPv4 validation is strict: exactly four octets, digits only, 0–255, no leading zeros.
 
+**Does an overlap always cause a problem?** No. Separate VPCs are separate private networks, so
+overlapping ranges are harmless while they never route to each other. The overlap breaks things once
+traffic has to cross:
+
+| Connection | Effect of an overlap |
+|---|---|
+| VPC peering | AWS refuses to create the peering connection |
+| Transit Gateway | Ambiguous routing: the more specific range wins, so some addresses become unreachable or reach the wrong VPC |
+| VPN / Direct Connect | The other side cannot tell which network an address belongs to |
+| Inside one network | Clashes with ranges such as the Docker bridge (`172.17.0.0/16`) or the EKS service CIDR |
+
+The check is a **policy check, not a runtime check**: it enforces that every VPC has its own address
+space, so any two can be connected later without re-IPing one of them (which means rebuilding subnets,
+clusters and load balancers). It reads the Terraform only, so it does not know which VPCs are currently
+connected.
+
+Overlaps can be intentional, for example reusing the same secondary pod range (`100.64.0.0/16`) in
+every EKS cluster's VPC, since pod IPs are not routed outside their VPC. These are reported as well
+(see Limitations).
+
 ### `versions`: version drift between environments
 
 **Why it matters.** Environments fall out of sync: prod stays on an old image tag, an old add-on major,
@@ -206,6 +226,10 @@ Findings:
 
 The step fails when the check finds errors, and the report is added to the run's job summary.
 
+For a complete example, see [platform-config](https://github.com/JayKearney/platform-config): every
+pull request is audited for VPC overlaps, version drift and dependency problems, and the checks are
+required before merging.
+
 ## Input formats
 
 **Terraform** (`network check`): a `.tf` file or a folder of them (searched recursively).
@@ -258,6 +282,11 @@ services:
 - `network` reads literal `cidr_block` values; ranges set through variables (`var.vpc_cidr`) are not
   resolved. Reading `terraform show -json` plan output would cover them.
 - `network` supports IPv4 only.
+- `network` flags every overlap, including intentional ones such as a shared pod range. Planned: an
+  allowlist (e.g. an `# infradoctor: allow-overlap` comment on the resource).
+- `network` does not know which VPCs are connected. Planned: read `aws_vpc_peering_connection` and
+  `aws_ec2_transit_gateway_vpc_attachment` to build a connectivity graph, and treat overlaps inside a
+  connected group (found with union-find) as errors and the others as warnings.
 - `logs` supports one log format; ingress-nginx and AWS ALB formats need their own parsers.
 - `logs` loads the whole file and sorts latencies; very large logs would need streaming and an
   approximate percentile structure (e.g. t-digest).
