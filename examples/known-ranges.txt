@@ -1,0 +1,4 @@
+# Ranges in use outside this repo (other teams, accounts, the office VPN).
+# name                  cidr
+shared-services-account 10.10.0.0/16
+office-vpn              192.168.0.0/16

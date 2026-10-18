@@ -28,6 +28,7 @@ Requires Python 3.11+. The only runtime dependency is PyYAML.
 
 ```bash
 infradoctor network check examples/terraform          # every .tf file in a folder
+infradoctor network check examples/terraform --known examples/known-ranges.txt
 infradoctor network overlap 10.0.0.0/16 10.0.128.0/24
 infradoctor network validate 10.0.0.1 256.1.1.1
 infradoctor versions examples/services.yaml
@@ -70,8 +71,10 @@ Findings:
 ```
 
 **How it works.**
-- Reads `aws_vpc` and `aws_vpc_ipv4_cidr_block_association` ranges from `.tf` files (static analysis,
-  nothing is applied). Subnets are skipped because they sit inside their VPC by design.
+- Reads VPC ranges from `.tf` files (static analysis, nothing is applied): `aws_vpc` and
+  `aws_vpc_ipv4_cidr_block_association` resources, and modules with a `cidr` argument such as
+  [terraform-aws-modules/vpc](https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws)
+  (`cidr` and `secondary_cidr_blocks`). Subnets are skipped because they sit inside their VPC by design.
 - Each IPv4 address is converted to a 32-bit integer; a CIDR becomes a `[start, end]` integer range
   using bit masks (`start = ip & mask`, `end = start | ~mask`).
 - **Overlap detection:** CIDR blocks are either disjoint or nested, never partially overlapping. After
@@ -79,6 +82,13 @@ Findings:
   on the stack contains the current one. **O(n log n)** instead of comparing every pair (O(n²)).
 - **Address space covered** merges the ranges first (the Merge Intervals pattern) so overlapping space
   is not double-counted.
+- **Ranges outside the repo:** `--known FILE` adds ranges defined elsewhere (other teams, other AWS
+  accounts, the office VPN). A VPC in this repo that overlaps one of them fails. Overlaps *between*
+  known ranges are ignored, since they are not this repo's to fix.
+- **Docker bridge:** a VPC overlapping `172.17.0.0/16` is a warning, because containers on Docker's
+  default bridge network cannot reach those addresses.
+- **Findings point at the line.** In GitHub Actions each finding becomes an annotation on the exact line
+  of the `.tf` file, so it shows up in the pull request's "Files changed" view.
 - IPv4 validation is strict: exactly four octets, digits only, 0–255, no leading zeros.
 
 **Does an overlap always cause a problem?** No. Separate VPCs are separate private networks, so
@@ -97,9 +107,19 @@ space, so any two can be connected later without re-IPing one of them (which mea
 clusters and load balancers). It reads the Terraform only, so it does not know which VPCs are currently
 connected.
 
-Overlaps can be intentional, for example reusing the same secondary pod range (`100.64.0.0/16`) in
-every EKS cluster's VPC, since pod IPs are not routed outside their VPC. These are reported as well
-(see Limitations).
+**Intentional overlaps.** Some overlaps are deliberate, for example reusing the same secondary pod range
+(`100.64.0.0/16`) in every EKS cluster's VPC, since pod IPs are not routed outside their VPC. Mark each
+range with a comment, on its `resource`/`module` line or on its `cidr_block` line:
+
+```hcl
+resource "aws_vpc_ipv4_cidr_block_association" "prod_pods" { # infradoctor: allow-overlap
+  vpc_id     = aws_vpc.prod.id
+  cidr_block = "100.64.0.0/16"
+}
+```
+
+An overlap is only allowed when **both** ranges are marked; it is then reported as info instead of an
+error. A new, unmarked VPC that lands in the shared range still fails.
 
 ### `versions`: version drift between environments
 
@@ -221,10 +241,11 @@ Findings:
 ```yaml
 - uses: JayKearney/infradoctor@v1
   with:
-    args: network check terraform/
+    args: network check terraform/ --known terraform/known-ranges.txt
 ```
 
-The step fails when the check finds errors, and the report is added to the run's job summary.
+The step fails when the check finds errors. Findings appear as annotations on the pull request (on the
+exact line, for Terraform), and the full report is added to the run's job summary.
 
 For a complete example, see [platform-config](https://github.com/JayKearney/platform-config): every
 pull request is audited for VPC overlaps, version drift and dependency problems, and the checks are
@@ -234,7 +255,8 @@ required before merging.
 
 **Terraform** (`network check`): a `.tf` file or a folder of them (searched recursively).
 
-**CIDR file** (`network check`): one range per line, optionally named. `#` starts a comment.
+**CIDR file** (`network check`, and `--known`): one range per line, optionally named. `#` starts a
+comment, and `# infradoctor: allow-overlap` marks an intentional overlap.
 
 ```text
 vpc-prod      10.0.0.0/16
@@ -261,15 +283,16 @@ services:
 ## Design
 
 ```
- input files ──> readers ──> common model ──> checks ──> Report ──> text / job summary + exit code
- (.tf, YAML,     (one per     (CIDR ranges,    (pure      (findings
-  logs, dirs)     format)      services graph)  functions) + severity)
+ input files ──> readers ──> common model ──> checks ──> Report ──> text / job summary /
+ (.tf, YAML,     (one per     (CIDR ranges,    (pure      (findings     PR annotations + exit code
+  logs, dirs)     format)      services graph)  functions) + severity
+                                                           + file:line)
 ```
 
 - **Readers are separate from checks.** The algorithms only see a simple internal model, so a new input
   source (e.g. another log format) is a new reader, not a change to the algorithms.
-- **Checks are pure functions** that return a `Report`; printing and exit codes live in one place.
-  This keeps every check easy to unit test.
+- **Checks are pure functions** that return a `Report`; printing, annotations and exit codes live in one
+  place. This keeps every check easy to unit test.
 - **Fail clearly on bad input.** Unparseable input is either reported (log lines) or rejected with a
   clear message and exit code 2, never silently turned into a wrong answer.
 - **Deterministic output.** Results are sorted so the same input always gives the same report,
@@ -279,14 +302,13 @@ services:
 
 ## Limitations and roadmap
 
-- `network` reads literal `cidr_block` values; ranges set through variables (`var.vpc_cidr`) are not
-  resolved. Reading `terraform show -json` plan output would cover them.
+- `network` reads literal values; ranges set through variables (`var.vpc_cidr`) are not resolved.
+  Reading `terraform show -json` plan output would cover them.
 - `network` supports IPv4 only.
-- `network` flags every overlap, including intentional ones such as a shared pod range. Planned: an
-  allowlist (e.g. an `# infradoctor: allow-overlap` comment on the resource).
 - `network` does not know which VPCs are connected. Planned: read `aws_vpc_peering_connection` and
   `aws_ec2_transit_gateway_vpc_attachment` to build a connectivity graph, and treat overlaps inside a
   connected group (found with union-find) as errors and the others as warnings.
+- `network` known ranges come from a file. Reading them from AWS VPC IPAM would keep them current.
 - `logs` supports one log format; ingress-nginx and AWS ALB formats need their own parsers.
 - `logs` loads the whole file and sorts latencies; very large logs would need streaming and an
   approximate percentile structure (e.g. t-digest).

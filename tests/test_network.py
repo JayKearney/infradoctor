@@ -117,3 +117,105 @@ def test_text_file_with_names_and_comments(tmp_path):
     assert [f.message for f in report.findings] == [
         "cidrs.txt line 4: '10.0.0.0/40': prefix must be a number between 0 and 32"
     ]
+
+
+
+MODULE_VPC = """
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+  cidr   = "10.0.0.0/16"
+  secondary_cidr_blocks = ["100.64.0.0/16", "100.65.0.0/16"]
+  private_subnets = ["10.0.1.0/24"]  # subnets are not compared
+}
+
+module "analytics_vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+  cidr   = "10.1.0.0/16"
+  secondary_cidr_blocks = [
+    "100.65.0.0/16",
+  ]
+}
+
+locals {
+  cidr = "10.0.0.0/8"  # not a VPC: must be ignored
+}
+"""
+
+
+def test_terraform_vpc_modules(tmp_path):
+    tf = tmp_path / "vpc.tf"
+    tf.write_text(MODULE_VPC)
+    report = check_file(tf)
+    assert "Ranges checked:      5" in report.lines
+    errors = [f for f in report.findings if f.severity == "error"]
+    assert [f.message for f in errors] == [
+        "module.analytics_vpc.secondary_cidr_blocks[0] (100.65.0.0/16) overlaps "
+        "module.vpc.secondary_cidr_blocks[1] (100.65.0.0/16)"
+    ]
+    assert errors[0].line == 13
+
+
+def test_findings_point_at_file_and_line(tmp_path):
+    tf = tmp_path / "network.tf"
+    tf.write_text(TERRAFORM)
+    error = next(f for f in check_file(tf).findings if f.severity == "error")
+    assert (error.file, error.line) == (str(tf), 12)
+
+
+ALLOWED = """
+resource "aws_vpc_ipv4_cidr_block_association" "cluster_a_pods" {  # infradoctor: allow-overlap
+  cidr_block = "100.64.0.0/16"
+}
+
+resource "aws_vpc_ipv4_cidr_block_association" "cluster_b_pods" {
+  cidr_block = "100.64.0.0/16"  # infradoctor: allow-overlap
+}
+
+resource "aws_vpc" "data" {
+  cidr_block = "100.64.128.0/20"
+}
+"""
+
+
+def test_allow_overlap_needs_both_sides(tmp_path):
+    tf = tmp_path / "pods.tf"
+    tf.write_text(ALLOWED)
+    findings = [(f.severity, f.message) for f in check_file(tf).findings]
+    assert findings == [
+        (
+            "info",
+            "aws_vpc_ipv4_cidr_block_association.cluster_b_pods (100.64.0.0/16) overlaps "
+            "aws_vpc_ipv4_cidr_block_association.cluster_a_pods (100.64.0.0/16) (allowed)",
+        ),
+        (
+            "error",
+            "aws_vpc.data (100.64.128.0/20) overlaps "
+            "aws_vpc_ipv4_cidr_block_association.cluster_a_pods (100.64.0.0/16)",
+        ),
+        (
+            "error",
+            "aws_vpc.data (100.64.128.0/20) overlaps "
+            "aws_vpc_ipv4_cidr_block_association.cluster_b_pods (100.64.0.0/16)",
+        ),
+    ]
+
+
+def test_known_ranges_from_other_repos(tmp_path):
+    tf = tmp_path / "vpc.tf"
+    tf.write_text('resource "aws_vpc" "new" {\n  cidr_block = "10.20.0.0/16"\n}\n')
+    known = tmp_path / "known.txt"
+    known.write_text("shared-prod 10.20.0.0/16\nlegacy-a 192.168.0.0/16\nlegacy-b 192.168.1.0/24\n")
+    report = check_file(tf, known=[known])
+    assert [f.message for f in report.findings] == [
+        "aws_vpc.new (10.20.0.0/16) overlaps shared-prod (10.20.0.0/16, known range from known.txt)"
+    ]  # legacy-a and legacy-b overlap each other, but neither is in this repo
+    assert report.findings[0].line == 2
+    assert "Known ranges:        3" in report.lines
+
+
+def test_docker_bridge_warning(tmp_path):
+    tf = tmp_path / "vpc.tf"
+    tf.write_text('resource "aws_vpc" "ci" {\n  cidr_block = "172.16.0.0/12"\n}\n')
+    [finding] = check_file(tf).findings
+    assert finding.severity == "warning"
+    assert "Docker default bridge" in finding.message

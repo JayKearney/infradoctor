@@ -28,7 +28,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = checks.add_parser("network", help="validate IPs and detect overlapping CIDRs")
     net = p.add_subparsers(dest="action", required=True, metavar="ACTION")
-    net.add_parser("check", help="check a file of CIDRs for overlaps").add_argument("file", type=Path)
+    # NEW: "check" now has a second option, --known
+    c = net.add_parser("check", help="check Terraform or a file of CIDRs for overlaps")
+    c.add_argument("file", type=Path, help="a .tf file, a folder of .tf files, or a CIDR text file")
+    c.add_argument(
+        "--known",
+        type=Path,
+        action="append",
+        metavar="FILE",
+        help="ranges defined outside this repo (CIDR text file); can be repeated",
+    )
     net.add_parser("overlap", help="check whether two CIDRs overlap").add_argument("cidrs", nargs=2)
     net.add_parser("validate", help="validate IPv4 addresses").add_argument("addresses", nargs="+")
 
@@ -52,7 +61,7 @@ def run(args: argparse.Namespace):
         return logs.check_file(args.file, args.top, args.window, args.max_error_rate, args.max_p99)
     if args.check == "network":
         if args.action == "check":
-            return network.check_file(args.file)
+            return network.check_file(args.file, args.known)  # CHANGED: passes the --known files on
         if args.action == "overlap":
             return network.check_overlap(*args.cidrs)
         return network.check_addresses(args.addresses)
