@@ -1,5 +1,5 @@
 name: infradoctor
-description: Audit infrastructure hygiene issues (logs, networks, storage, versions, dependencies)
+description: Catch overlapping VPCs, version drift and dependency problems in pull requests
 
 branding:
   icon: activity
@@ -7,8 +7,12 @@ branding:
 
 inputs:
   args:
-    description: 'Arguments for infradoctor, e.g. "network check network/cidrs.txt"'
+    description: 'Arguments for infradoctor, e.g. "network check terraform/"'
     required: true
+  fail-on:
+    description: 'Fail the step on "error" (default) or also on "warning"'
+    required: false
+    default: error
   python-version:
     description: Python version to run infradoctor with
     required: false
@@ -29,6 +33,7 @@ runs:
 
     - name: Run infradoctor
       shell: bash
-      run: infradoctor $INFRADOCTOR_ARGS
+      run: infradoctor --fail-on "$FAIL_ON" $INFRADOCTOR_ARGS
       env:
+        FAIL_ON: ${{ inputs.fail-on }}
         INFRADOCTOR_ARGS: ${{ inputs.args }}
