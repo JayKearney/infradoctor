@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from infradoctor.cli import main
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -26,3 +28,16 @@ def test_writes_github_summary(tmp_path, monkeypatch):
     text = summary.read_text()
     assert text.startswith("## Dependency check")
     assert "Deploy order:" in text
+
+
+def test_fail_on_warning(tmp_path):
+    tf = tmp_path / "vpc.tf"
+    tf.write_text('resource "aws_vpc" "ci" {\n  cidr_block = "172.16.0.0/12"\n}\n')  # Docker bridge warning only
+    assert main(["network", "check", str(tf)]) == 0
+    assert main(["--fail-on", "warning", "network", "check", str(tf)]) == 1
+
+
+def test_fail_on_rejects_unknown_values(capsys):
+    with pytest.raises(SystemExit):
+        main(["--fail-on", "info", "network", "validate", "10.0.0.1"])
+    assert "invalid choice" in capsys.readouterr().err

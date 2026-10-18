@@ -17,9 +17,9 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -38,9 +38,26 @@ jobs:
     name: Action smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run the action from this repo
         uses: ./
         with:
           args: network overlap 10.0.0.0/16 10.1.0.0/16
+
+      - name: Create a VPC that only triggers a warning
+        run: printf 'resource "aws_vpc" "ci" {\n  cidr_block = "172.16.0.0/12"\n}\n' > "$RUNNER_TEMP/warning.tf"
+
+      - name: fail-on warning must fail on a warning
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          args: network check ${{ runner.temp }}/warning.tf
+          fail-on: warning
+
+      - name: Check that it failed
+        if: steps.strict.outcome != 'failure'
+        run: |
+          echo "fail-on: warning did not fail the step"
+          exit 1

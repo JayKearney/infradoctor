@@ -28,3 +28,13 @@ def test_annotations_only_printed_in_github_actions(monkeypatch, capsys):
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     emit(report)
     assert "::error title=infradoctor,file=vpcs.tf,line=3::overlap" in capsys.readouterr().out
+
+
+
+def test_fail_on_warning():
+    report = Report("Network check")
+    report.add(WARNING, "overlaps the Docker default bridge")
+    assert not report.failed()
+    assert report.failed("warning")
+    report.add(ERROR, "overlap")
+    assert report.failed()

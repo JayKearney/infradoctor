@@ -37,6 +37,16 @@ class Report:
     def has_errors(self) -> bool:
         return any(f.severity == ERROR for f in self.findings)
 
+    @property
+    def has_warnings(self) -> bool:
+        return any(f.severity == WARNING for f in self.findings)
+
+    def failed(self, fail_on: str = ERROR) -> bool:
+        """Whether this report should fail the run: on errors, or also on warnings."""
+        if fail_on == WARNING:
+            return self.has_errors or self.has_warnings
+        return self.has_errors
+
     def render_text(self) -> str:
         out = [self.title, "=" * len(self.title)]
         out.extend(self.lines)
@@ -103,9 +113,10 @@ def render_annotations(report: Report) -> list[str]:
     return commands
 
 
-def emit(report: Report) -> int:
+def emit(report: Report, fail_on: str = ERROR) -> int:
     """Print the report and, when running in GitHub Actions, add annotations and
-    a job summary. Returns the process exit code (1 if any errors were found)."""
+    a job summary. Returns the process exit code: 1 if the report failed
+    (errors, or also warnings with fail_on="warning"), otherwise 0."""
     print(report.render_text())
     if os.environ.get("GITHUB_ACTIONS") == "true":
         for command in render_annotations(report):
@@ -114,4 +125,4 @@ def emit(report: Report) -> int:
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as fh:
             fh.write(report.render_markdown())
-    return 1 if report.has_errors else 0
+    return 1 if report.failed(fail_on) else 0
