@@ -6,6 +6,9 @@ A small CLI that audits common infrastructure hygiene issues **before** they tur
 It reads the files platform teams already have (Terraform, service inventories, access logs,
 artifact folders) and reports what needs fixing. Run it by hand, or as a gate in CI.
 
+> **Project status:** personal project, maintained on a best-effort basis. Bug reports and suggestions are welcome
+> as issues.
+
 | Check | Finds | Typical use |
 |---|---|---|
 | `network` | Overlapping VPC ranges, invalid IPv4 addresses | Pull request gate on Terraform changes |
@@ -14,10 +17,16 @@ artifact folders) and reports what needs fixing. Run it by hand, or as a gate in
 | `storage` | Duplicate files wasting disk or artifact storage | Cleanup audit of build agents and artifact stores |
 | `logs` | Error rate, p50/p95/p99 latency, noisy clients, error spikes | Incident triage; post-deploy or load-test gate |
 
-![A pull request blocked by infradoctor, with the reason shown on the exact Terraform line](docs/images/pr-annotation.png)
+### What it looks like in a pull request
 
-> **Project status:** personal project, maintained on a best-effort basis. Bug reports and suggestions are welcome
-> as issues.
+A pull request adds a VPC whose range is already used by another team's account. infradoctor reports the problem
+on the exact line of the Terraform change:
+
+![infradoctor annotation on the cidr_block line of a new aws_vpc, reporting an overlap with a known range](docs/images/pr-annotation.png)
+
+With the check required on the main branch, the pull request cannot be merged until the range is fixed:
+
+![Pull request checks: the network check is failing and merging is blocked](docs/images/pr-blocked.png)
 
 ---
 
@@ -259,8 +268,6 @@ Findings:
 
 The step fails when the check finds errors. Findings appear as annotations on the pull request (on the
 exact line, for Terraform), and the full report is added to the run's job summary.
-
-![Merging is blocked until the network check passes](docs/images/pr-blocked.png)
 
 For a complete example, see [platform-config](https://github.com/JayKearney/platform-config): every
 pull request is audited for VPC overlaps, version drift and dependency problems, and the checks are
