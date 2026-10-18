@@ -14,6 +14,11 @@ artifact folders) and reports what needs fixing. Run it by hand, or as a gate in
 | `storage` | Duplicate files wasting disk or artifact storage | Cleanup audit of build agents and artifact stores |
 | `logs` | Error rate, p50/p95/p99 latency, noisy clients, error spikes | Incident triage; post-deploy or load-test gate |
 
+![A pull request blocked by infradoctor, with the reason shown on the exact Terraform line](docs/images/pr-annotation.png)
+
+> **Project status:** personal project, maintained on a best-effort basis. Bug reports and suggestions are welcome
+> as issues.
+
 ---
 
 ## Install
@@ -35,6 +40,7 @@ infradoctor versions examples/services.yaml
 infradoctor deps examples/services.yaml --impact postgres
 infradoctor storage examples/artifacts --min-size 1048576
 infradoctor logs examples/access.log --max-error-rate 0.02 --max-p99 0.5
+infradoctor --fail-on warning network check examples/terraform   # warnings fail the run too
 ```
 
 Every check has `--help`. `python -m infradoctor ...` works too.
@@ -48,6 +54,7 @@ Every check has `--help`. `python -m infradoctor ...` works too.
 | `2` | Could not run: bad arguments or unreadable input |
 
 Severities: **error** fails the run, **warning** is reported but does not fail, **info** is context.
+With `--fail-on warning` (before the check name), warnings fail the run as well.
 
 ---
 
@@ -244,12 +251,23 @@ Findings:
     args: network check terraform/ --known terraform/known-ranges.txt
 ```
 
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `args` | yes | | Arguments for infradoctor, e.g. `network check terraform/` |
+| `fail-on` | no | `error` | Fail the step on `error`, or also on `warning` |
+| `python-version` | no | `3.12` | Python version used to run infradoctor |
+
 The step fails when the check finds errors. Findings appear as annotations on the pull request (on the
 exact line, for Terraform), and the full report is added to the run's job summary.
+
+![Merging is blocked until the network check passes](docs/images/pr-blocked.png)
 
 For a complete example, see [platform-config](https://github.com/JayKearney/platform-config): every
 pull request is audited for VPC overlaps, version drift and dependency problems, and the checks are
 required before merging.
+
+The Action pins its own dependencies (`actions/setup-python`) to a full commit SHA, and only needs
+read access to the repository.
 
 ## Input formats
 
