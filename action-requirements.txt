@@ -2,4 +2,4 @@
 # Used as pip constraints: they fix versions, they don't add packages.
 # Dependabot keeps them up to date.
 PyYAML==6.0.3
-setuptools==80.9.0
+setuptools==83.0.0
