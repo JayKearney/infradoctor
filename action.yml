@@ -30,6 +30,7 @@ runs:
       run: pip install --quiet "$ACTION_PATH"
       env:
         ACTION_PATH: ${{ github.action_path }}
+        PIP_CONSTRAINT: ${{ github.action_path }}/action-requirements.txt
 
     - name: Run infradoctor
       shell: bash

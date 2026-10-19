@@ -61,3 +61,10 @@ jobs:
         run: |
           echo "fail-on: warning did not fail the step"
           exit 1
+
+      - name: Check the Action installed the pinned PyYAML
+        run: |
+          expected=$(grep -i '^pyyaml==' action-requirements.txt | cut -d= -f3)
+          actual=$(python -c "import yaml; print(yaml.__version__)")
+          echo "expected PyYAML $expected, installed $actual"
+          test "$expected" = "$actual"

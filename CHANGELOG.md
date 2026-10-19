@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-10-19
+
+### Security
+- The Action installs exact, tested versions of its Python dependencies (PyYAML and setuptools) from
+  `action-requirements.txt`, instead of the newest version on PyPI.
+- First immutable release: the `v1.2.1` tag can never be moved or deleted.
+
 ## [1.2.0] - 2026-10-18
 
 ### Added
@@ -28,6 +35,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - First release: `network`, `versions`, `deps`, `storage` and `logs` checks.
 - GitHub Action with job summaries.
 
+[1.2.1]: https://github.com/JayKearney/infradoctor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/JayKearney/infradoctor/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/JayKearney/infradoctor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/JayKearney/infradoctor/releases/tag/v1.0.0

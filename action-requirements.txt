@@ -1,0 +1,5 @@
+# Exact versions installed when infradoctor runs as a GitHub Action.
+# Used as pip constraints: they fix versions, they don't add packages.
+# Dependabot keeps them up to date.
+PyYAML==6.0.3
+setuptools==80.9.0
