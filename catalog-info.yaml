@@ -5,6 +5,7 @@ metadata:
   description: CLI and GitHub Action that checks infrastructure changes on pull requests
   annotations:
     github.com/project-slug: JayKearney/infradoctor
+    backstage.io/techdocs-ref: dir:.
   tags:
     - python
     - github-actions

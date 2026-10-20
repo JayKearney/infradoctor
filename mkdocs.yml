@@ -1,0 +1,11 @@
+site_name: infradoctor
+site_description: CLI and GitHub Action that checks infrastructure changes on pull requests
+
+nav:
+  - Home: index.md
+  - The checks: checks.md
+  - GitHub Action: github-action.md
+  - Security and releases: security.md
+
+plugins:
+  - techdocs-core
