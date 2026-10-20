@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: infradoctor
+  description: CLI and GitHub Action that checks infrastructure changes on pull requests
+  annotations:
+    github.com/project-slug: JayKearney/infradoctor
+  tags:
+    - python
+    - github-actions
+    - terraform
+  links:
+    - url: https://github.com/marketplace/actions/infradoctor
+      title: GitHub Marketplace
+    - url: https://github.com/JayKearney/infradoctor/blob/main/CHANGELOG.md
+      title: Changelog
+spec:
+  type: tool
+  lifecycle: production
+  owner: user:JayKearney
