@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.3] - 2026-10-27
+
+### Changed
+
+- Action: setuptools 84.0.0 → 84.2.1 in `action-requirements.txt`.
+- Action: `actions/setup-python` 7.0.0 → 7.1.0, pinned by commit SHA.
+
 ## [1.2.2] - 2026-10-19
 
 ### Security
@@ -41,6 +48,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - First release: `network`, `versions`, `deps`, `storage` and `logs` checks.
 - GitHub Action with job summaries.
 
+[1.2.3]: https://github.com/JayKearney/infradoctor/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/JayKearney/infradoctor/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/JayKearney/infradoctor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/JayKearney/infradoctor/compare/v1.1.0...v1.2.0
